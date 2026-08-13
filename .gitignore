@@ -1,0 +1,12 @@
+# Dependencias de Node.js
+node_modules/
+
+# Credenciales de WhatsApp (¡NUNCA subir esto a GitHub!)
+auth_info_baileys/
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+.env
