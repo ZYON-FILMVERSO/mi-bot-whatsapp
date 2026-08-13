@@ -38,8 +38,8 @@ const parseTime = (timeStr) => {
     if (!match) return null;
     const value = parseInt(match[1]);
     const unit = match[2];
-    if (unit === 'm') return value * 60 * 1000;
-    if (unit === 'h') return value * 60 * 60 * 1000;
+    if (unit === 'm') return value * 60 * 1000; // minutos
+    if (unit === 'h') return value * 60 * 60 * 1000; // horas
     return null;
 };
 
@@ -103,7 +103,7 @@ async function startSock() {
                     } else {
                         await sock.sendMessage(sender, { delete: msg.key });
                         await sock.sendMessage(sender, { text: `🚫 Estás muteado. Debes esperar.` });
-                        return;
+                        return; // No procesamos este mensaje
                     }
                 }
 
@@ -118,11 +118,8 @@ async function startSock() {
                 }
 
                 // 3. COMANDOS DE ADMINISTRACIÓN (SIN PREFIJO)
-                // Dividimos el texto para identificar la primera palabra
                 const parts = text.trim().split(/\s+/);
                 const command = parts[0].toLowerCase();
-                
-                // Lista de comandos permitidos sin prefijo
                 const adminCommands = ['mute', 'unmute', 'delete', 'eliminar', 'antilink'];
 
                 if (adminCommands.includes(command)) {
@@ -132,17 +129,21 @@ async function startSock() {
                     const isBotAdmin = groupMeta.participants.find(p => p.id === botJid)?.admin === 'admin';
 
                     if (!isBotAdmin) {
-                        await sock.sendMessage(sender, { text: '❌ No soy administrador de este grupo.' });
+                        await sock.sendMessage(sender, { text: '❌ No soy administrador en este grupo. Para usar comandos de administración (mute, unmute, delete, antilink), por favor, conviérteme en administrador.' });
                         return;
                     }
 
-                    // Obtener objetivo (por mención o respuesta)
+                    // Obtener el objetivo (por mención o respuesta)
                     let targetJid = null;
                     let targetFromReply = null;
+                    
+                    // Detectar mención
+                    const mentionedJid = msg.message.extendedTextMessage?.contextInfo?.mentionedJid;
+                    // Detectar respuesta a un mensaje
                     if (msg.message.extendedTextMessage?.contextInfo?.quotedMessage) {
                         targetFromReply = msg.message.extendedTextMessage.contextInfo.participant;
                     }
-                    const mentionedJid = msg.message.extendedTextMessage?.contextInfo?.mentionedJid;
+                    
                     if (mentionedJid && mentionedJid.length > 0) {
                         targetJid = mentionedJid[0];
                     } else if (targetFromReply) {
@@ -177,7 +178,7 @@ async function startSock() {
                     } 
                     else if (command === 'mute' || command === 'unmute') {
                         if (!targetJid) {
-                            await sock.sendMessage(sender, { text: '❌ Menciona al usuario (@usuario) o responde a su mensaje.' });
+                            await sock.sendMessage(sender, { text: '❌ Debes mencionar al usuario o responder a su mensaje para mutear/desmutear.' });
                             return;
                         }
 
@@ -191,34 +192,35 @@ async function startSock() {
                                 await sock.sendMessage(sender, { text: `ℹ️ @${targetJid.split('@')[0]} no está muteado.`, mentions: [targetJid] });
                             }
                         } else { // Comando mute
-                            // Detectar el tiempo (puede estar en parts[1] o parts[2])
+                            // Detectar el tiempo (ej: 5m, 10h)
                             let timeStr = null;
+                            let duration = Infinity; // Por defecto es indefinido
+                            
                             for (let i = 1; i < parts.length; i++) {
-                                if (parseTime(parts[i])) {
+                                const parsed = parseTime(parts[i]);
+                                if (parsed !== null) {
                                     timeStr = parts[i];
+                                    duration = parsed;
                                     break;
                                 }
                             }
 
-                            let duration, durationText;
-                            if (timeStr) {
-                                duration = parseTime(timeStr);
-                                durationText = timeStr;
-                            } else {
-                                duration = Infinity;
-                                durationText = 'indefinidamente';
-                            }
-
+                            const durationText = timeStr || 'indefinidamente';
                             mutedUsers.set(muteKeyTarget, { expiresAt: duration === Infinity ? Infinity : Date.now() + duration });
+                            
                             await sock.sendMessage(sender, { text: `🔇 @${targetJid.split('@')[0]} muteado por ${durationText}.`, mentions: [targetJid] });
                         }
                     }
-                    return; // Salimos del evento para no activar la IA
+                    return; // Salimos para que NO se active la IA en un comando
                 }
             }
 
-            // --- Lógica de la IA (Se ejecuta si NO es un comando de admin) ---
-            if (text && /IA|Zyon|bot/i.test(text)) {
+            // --- Lógica de la IA (CORREGIDA) ---
+            // Si es un chat privado (no grupo) -> RESPONDE A TODO
+            // Si es un grupo (isGroup true) -> RESPONDE SOLO si contiene IA, Zyon o bot
+            const shouldRunAI = !isGroup || (text && /IA|Zyon|bot/i.test(text));
+
+            if (shouldRunAI) {
                 console.log(`🤖 Mensaje para la IA de ${sender}: ${text}`);
                 try {
                     await sock.sendPresenceUpdate('composing', sender);
@@ -226,15 +228,15 @@ async function startSock() {
                     await sock.sendMessage(sender, { text: aiResponse });
                     console.log(`✅ Respuesta enviada a ${sender}`);
                 } catch (innerError) {
-                    console.error('❌ Error al procesar el mensaje (IA o envío):', innerError);
+                    console.error('❌ Error al procesar la IA:', innerError);
                     try {
                         await sock.sendMessage(sender, { text: "uy, me falló el cerebro :( mejor avísale a @Elvis28_ que revise los logs." });
                     } catch (sendError) {
                         console.error("❌ Tampoco pude enviar el mensaje de error al usuario:", sendError);
                     }
                 }
-            } else if (!isGroup) {
-                console.log('⏭️ El mensaje no contiene palabras clave (IA, Zyon o bot)');
+            } else if (isGroup) {
+                console.log('⏭️ Grupo: El mensaje no contiene las palabras clave (IA, Zyon o bot).');
             }
 
         } catch (outerError) {
