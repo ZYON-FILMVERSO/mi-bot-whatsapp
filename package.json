@@ -1,8 +1,17 @@
-"dependencies": {
-  "@whiskeysockets/baileys": "^6.7.5",
-  "express": "^4.19.2",
-  "qrcode": "^1.5.3",
-  "@hapi/boom": "^10.0.1",
-  "pino": "^9.2.0",
-  "groq-sdk": "^0.2.0"
+{
+  "name": "filmverso-zyon-bot",
+  "version": "1.0.0",
+  "description": "Bot de WhatsApp para FILMVERSO-ZYON con IA",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.5",
+    "express": "^4.19.2",
+    "qrcode": "^1.5.3",
+    "@hapi/boom": "^10.0.1",
+    "pino": "^9.2.0",
+    "groq-sdk": "^0.2.0"
+  }
 }
