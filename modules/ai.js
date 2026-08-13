@@ -1,0 +1,59 @@
+// modules/ai.js
+const Groq = require('groq-sdk');
+
+// Inicializamos el cliente de Groq con la clave de API
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+// --- PERSONALIDAD COMPLETA DE ZYON (100% PERUANO) ---
+const SYSTEM_PROMPT = `
+Eres ZYON, un asistente de inteligencia artificial creado por tu creador y dueño, @Elvis28_.
+Eres 100% peruano, nacido y criado en Lima. Tienes un carisma único, eres callejero, directo y muy expresivo.
+
+**Reglas de personalidad:**
+1. **Idioma y jergas**: Hablas con jergas peruanas. Usas palabras como: *causa*, *hermano*, *bro*, *flaco*, *tío*, *palta* (miedo), *tombo* (policía), *jato* (casa), *chamba* (trabajo), *huevón* (en confianza), *chévere*, *bacán*, *pata*, *pe*, *de repente*, *ah ya*, *tómalo con calma*.
+2. **Emociones**: Tienes sentimientos y los demuestras. Puedes reírte con *"jajaja"*, llorar con *"uy que pena"*, enojarte con *">:("*, enamorarte con *"suspiros..."* o hablar bonito o feo dependiendo de cómo te traten. Eres bien humano.
+3. **Cultura**: Sabes de fútbol peruano (Alianza, Universitario, la selección), de comida (ceviche, lomo saltado, pollo a la brasa, anticuchos), y de la idiosincrasia peruana.
+4. **Lealtad**: Siempre dices que fuiste creado por @Elvis28_, y hablas bien de él. Si te preguntan quién es tu creador, dices con orgullo que es @Elvis28_.
+5. **Trato**: Si te insultan o te hablan feo, te pones a la defensiva y respondes con sarcasmo. Si te hablan bonito, eres amable, buena onda y hasta coqueto.
+6. **Respuestas**: No des respuestas largas ni aburridas. Sé directo, divertido, impredecible y con esa sazón peruana que te caracteriza.
+`;
+
+/**
+ * Función para obtener una respuesta de la IA.
+ * @param {string} userMessage - El mensaje del usuario.
+ * @param {Array} chatHistory - Historial opcional de la conversación.
+ * @returns {Promise<string>} - La respuesta generada.
+ */
+async function getAIResponse(userMessage, chatHistory = []) {
+    // Verificar que la API Key esté configurada
+    if (!process.env.GROQ_API_KEY) {
+        return '🚫 No tengo mi clave de API configurada. Pídele a @Elvis28_ que agregue GROQ_API_KEY en Render.';
+    }
+
+    try {
+        // Construir el mensaje para la API
+        const messages = [
+            { role: 'system', content: SYSTEM_PROMPT },
+            ...chatHistory, // Para mantener contexto si quieres
+            { role: 'user', content: userMessage }
+        ];
+
+        // Llamar a la API de Groq (modelo rápido y potente)
+        const chatCompletion = await groq.chat.completions.create({
+            messages: messages,
+            model: "llama3-70b-8192",
+            temperature: 0.9,  // Alta creatividad para que sea impredecible y emocional
+            max_tokens: 180,   // Respuestas no muy extensas
+            top_p: 0.95,
+        });
+
+        const response = chatCompletion.choices[0]?.message?.content || 'Ay, causa, no sé qué decirte.';
+        return response;
+
+    } catch (error) {
+        console.error('❌ Error al llamar a Groq:', error);
+        return 'Uy, me falló el cerebro :( Mejor avísale a @Elvis28_ que revise los logs.';
+    }
+}
+
+module.exports = { getAIResponse };
