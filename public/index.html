@@ -5,295 +5,619 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Mis Sub-Bots — FILMVERSO-ZYON</title>
   <style>
-    /* Aquí van todos los estilos que ya teníamos */
-    /* ... (copia los estilos del código anterior) ... */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0b0e14;
+      color: #e8edf5;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .dashboard {
+      max-width: 820px;
+      width: 100%;
+    }
+
+    .panel {
+      background: #161c26;
+      border-radius: 20px;
+      padding: 2rem 1.8rem;
+      border: 1px solid #2a3340;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    }
+
+    .hero {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+
+    .hero .eyebrow {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #7a8ba3;
+    }
+
+    .hero h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #f0c060, #d4a040);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero p {
+      color: #9aabbd;
+      margin-top: 0.2rem;
+    }
+
+    .btn-primary {
+      background: #f0c060;
+      border: none;
+      color: #0b0e14;
+      font-weight: 600;
+      padding: 0.7rem 1.6rem;
+      border-radius: 40px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: 0.2s;
+    }
+
+    .btn-primary:hover {
+      background: #e0b04e;
+      transform: scale(1.02);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid #3d4a5c;
+      color: #c8d2df;
+      padding: 0.7rem 1.6rem;
+      border-radius: 40px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: #1f2937;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 4rem 1rem;
+    }
+
+    .empty-state .emoji-big {
+      font-size: 4rem;
+      display: block;
+      margin-bottom: 1rem;
+    }
+
+    .empty-state h2 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .empty-state p {
+      color: #7a8ba3;
+      margin-bottom: 1.5rem;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(6px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      z-index: 999;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal-card {
+      background: #1a212b;
+      border-radius: 28px;
+      max-width: 560px;
+      width: 100%;
+      padding: 2rem 1.8rem;
+      border: 1px solid #2f3b4a;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-card header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1.8rem;
+    }
+
+    .modal-card header .eyebrow {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #7a8ba3;
+    }
+
+    .modal-card header h2 {
+      font-size: 1.5rem;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: #9aabbd;
+      font-size: 1.8rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .modal-close:hover {
+      color: #fff;
+    }
+
+    .form-group {
+      margin-bottom: 1.4rem;
+    }
+
+    .form-group label {
+      display: block;
+      font-weight: 500;
+      font-size: 0.9rem;
+      color: #c8d2df;
+      margin-bottom: 0.3rem;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 0.7rem 1rem;
+      background: #0f151e;
+      border: 1px solid #2f3b4a;
+      border-radius: 12px;
+      color: #e8edf5;
+      font-size: 1rem;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #f0c060;
+    }
+
+    .form-group small {
+      display: block;
+      color: #6a7b8d;
+      font-size: 0.75rem;
+      margin-top: 0.2rem;
+    }
+
+    .brand-preview {
+      background: #0f151e;
+      padding: 0.8rem 1rem;
+      border-radius: 12px;
+      margin-top: 0.5rem;
+      border-left: 3px solid #f0c060;
+      font-size: 0.9rem;
+      color: #c8d2df;
+    }
+
+    .brand-preview strong {
+      color: #f0c060;
+    }
+
+    .switch-row {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      margin: 0.8rem 0;
+    }
+
+    .switch-row input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      accent-color: #f0c060;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 0.8rem;
+      justify-content: flex-end;
+      margin-top: 1.8rem;
+    }
+
+    .pair-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      background: #0f151e;
+      padding: 0.3rem;
+      border-radius: 40px;
+    }
+
+    .pair-tabs button {
+      flex: 1;
+      padding: 0.5rem;
+      background: transparent;
+      border: none;
+      border-radius: 30px;
+      color: #9aabbd;
+      font-weight: 500;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .pair-tabs button.active {
+      background: #f0c060;
+      color: #0b0e14;
+    }
+
+    .pair-panel {
+      display: none;
+    }
+
+    .pair-panel.active {
+      display: block;
+    }
+
+    .pair-panel p {
+      color: #9aabbd;
+      margin-bottom: 1rem;
+    }
+
+    .pair-code {
+      display: block;
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 6px;
+      background: #0f151e;
+      padding: 1rem;
+      text-align: center;
+      border-radius: 16px;
+      margin-top: 1rem;
+      font-family: monospace;
+      color: #f0c060;
+    }
+
+    .qr-box {
+      background: #0f151e;
+      padding: 2rem;
+      text-align: center;
+      border-radius: 16px;
+      min-height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #6a7b8d;
+      margin-top: 1rem;
+    }
+
+    .qr-box img {
+      max-width: 200px;
+      border-radius: 12px;
+      background: white;
+      padding: 10px;
+    }
+
+    @media (max-width: 600px) {
+      .hero {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+      }
+      .modal-card {
+        padding: 1.5rem;
+      }
+    }
   </style>
 </head>
+
 <body>
-<div class="dashboard">
+  <div class="dashboard">
 
-  <!-- CABECERA -->
-  <section class="panel hero">
-    <div>
-      <span class="eyebrow">🤖 FILMVERSO-ZYON</span>
-      <h1>Mis Sub-Bots</h1>
-      <p>Vincula tu WhatsApp y personaliza la identidad de tu Sub-Bot.</p>
-    </div>
-    <button class="btn-primary" id="openModalBtn">＋ Nuevo Sub-Bot</button>
-  </section>
+    <!-- CABECERA -->
+    <section class="panel hero">
+      <div>
+        <span class="eyebrow">🤖 FILMVERSO-ZYON</span>
+        <h1>Mis Sub-Bots</h1>
+        <p>Vincula tu WhatsApp y personaliza la identidad de tu Sub-Bot.</p>
+      </div>
+      <button class="btn-primary" id="openModalBtn">＋ Nuevo Sub-Bot</button>
+    </section>
 
-  <!-- ESTADO VACÍO -->
-  <section class="panel empty-state" id="emptyState">
-    <span class="emoji-big">🎬</span>
-    <h2>Aún no tienes un Sub-Bot</h2>
-    <p>Tu cuenta permite crear 1 Sub-Bot.</p>
-    <button class="btn-primary" id="emptyCreateBtn">Crear mi Sub-Bot</button>
-  </section>
+    <!-- ESTADO VACÍO -->
+    <section class="panel empty-state" id="emptyState">
+      <span class="emoji-big">🎬</span>
+      <h2>Aún no tienes un Sub-Bot</h2>
+      <p>Tu cuenta permite crear 1 Sub-Bot.</p>
+      <button class="btn-primary" id="emptyCreateBtn">Crear mi Sub-Bot</button>
+    </section>
 
-  <!-- MODAL: CONFIGURACIÓN -->
-  <div class="modal-overlay" id="configModal">
-    <div class="modal-card">
-      <header>
-        <div>
-          <span class="eyebrow">CONFIGURACIÓN</span>
-          <h2 id="modalTitle">Nuevo Sub-Bot</h2>
-        </div>
-        <button class="modal-close" id="closeModalBtn">×</button>
-      </header>
-      <form id="subbotForm">
-        <div class="form-group">
-          <label for="phone">Número de WhatsApp</label>
-          <input type="text" id="phone" inputmode="numeric" placeholder="51912345678" required />
-          <small>Incluye código del país, solo números.</small>
-        </div>
-        <div class="form-group">
-          <label for="name">Nombre del Sub-Bot</label>
-          <input type="text" id="name" maxlength="40" value="Filmverso Subbot" required />
-          <div class="brand-preview">
-            <strong id="brandPreview">Filmverso Subbot | Made With © FILMVERSO-ZYON</strong>
+    <!-- MODAL: CONFIGURACIÓN -->
+    <div class="modal-overlay" id="configModal">
+      <div class="modal-card">
+        <header>
+          <div>
+            <span class="eyebrow">CONFIGURACIÓN</span>
+            <h2 id="modalTitle">Nuevo Sub-Bot</h2>
           </div>
-        </div>
-        <div class="form-group">
-          <label for="prefix">Prefijo</label>
-          <input type="text" id="prefix" maxlength="4" value="." required />
-        </div>
-        <div class="form-group">
-          <label for="statusText">Estado interno</label>
-          <input type="text" id="statusText" maxlength="139" placeholder="Activo con FILMVERSO-ZYON" />
-        </div>
-        <div class="switch-row">
-          <input type="checkbox" id="autoRead" />
-          <label for="autoRead">Lectura automática</label>
-        </div>
-        <div class="modal-actions">
-          <button type="button" class="btn-secondary" id="cancelModalBtn">Cancelar</button>
-          <button type="submit" class="btn-primary">Guardar cambios</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL: VINCULACIÓN -->
-  <div class="modal-overlay" id="pairModal">
-    <div class="modal-card">
-      <header>
-        <div>
-          <span class="eyebrow">VINCULACIÓN</span>
-          <h2>Conectar WhatsApp</h2>
-        </div>
-        <button class="modal-close" id="closePairBtn">×</button>
-      </header>
-      <div class="pair-tabs">
-        <button class="active" data-tab="code">Código</button>
-        <button data-tab="qr">QR</button>
-      </div>
-      <!-- Panel Código -->
-      <div class="pair-panel active" id="panelCode">
-        <p>Ingresa tu número y genera un código para vincularlo en WhatsApp.</p>
-        <div style="display:flex;gap:0.5rem;margin-bottom:1rem;">
-          <input type="text" id="pairPhone" placeholder="51912345678" style="flex:1;padding:0.7rem 1rem;background:#0f151e;border:1px solid #2f3b4a;border-radius:12px;color:#e8edf5;" />
-          <button class="btn-primary" id="generateCodeBtn">Generar</button>
-        </div>
-        <output class="pair-code" id="pairCode">— — — — — — — —</output>
-        <p style="margin-top:0.8rem;font-size:0.8rem;color:#7a8ba3;">Ve a WhatsApp → Dispositivos vinculados → Vincular con código de 8 dígitos</p>
-      </div>
-      <!-- Panel QR -->
-      <div class="pair-panel" id="panelQr">
-        <p>Escanea este código desde WhatsApp.</p>
-        <button class="btn-primary" id="generateQrBtn">Actualizar QR</button>
-        <div class="qr-box" id="qrBox">
-          <div style="text-align:center;color:#6a7b8d;">
-            <div style="font-size:2rem;margin-bottom:0.5rem;">📷</div>
-            Esperando QR...
+          <button class="modal-close" id="closeModalBtn">×</button>
+        </header>
+        <form id="subbotForm">
+          <div class="form-group">
+            <label for="phone">Número de WhatsApp</label>
+            <input type="text" id="phone" inputmode="numeric" placeholder="51912345678" required />
+            <small>Incluye código del país, solo números.</small>
           </div>
-        </div>
-        <p style="margin-top:0.8rem;font-size:0.8rem;color:#7a8ba3;">Ve a WhatsApp → Dispositivos vinculados → Vincular con código QR</p>
-      </div>
-    </div>
-  </div>
-
-</div>
-
-<script>
-  // ===== Elementos del DOM =====
-  const $ = (sel) => document.querySelector(sel);
-  const $$ = (sel) => document.querySelectorAll(sel);
-
-  const emptyState = $('#emptyState');
-  const configModal = $('#configModal');
-  const pairModal = $('#pairModal');
-  const openModalBtn = $('#openModalBtn');
-  const emptyCreateBtn = $('#emptyCreateBtn');
-  const closeModalBtn = $('#closeModalBtn');
-  const cancelModalBtn = $('#cancelModalBtn');
-  const closePairBtn = $('#closePairBtn');
-  const subbotForm = $('#subbotForm');
-  const generateCodeBtn = $('#generateCodeBtn');
-  const generateQrBtn = $('#generateQrBtn');
-  const pairCode = $('#pairCode');
-  const qrBox = $('#qrBox');
-  const pairPhone = $('#pairPhone');
-
-  // ===== Abrir/Cerrar modales =====
-  function openConfig() { configModal.classList.add('open'); }
-  function closeConfig() { configModal.classList.remove('open'); }
-  function openPair() { pairModal.classList.add('open'); }
-  function closePair() { pairModal.classList.remove('open'); }
-
-  openModalBtn.addEventListener('click', openConfig);
-  emptyCreateBtn.addEventListener('click', openConfig);
-  closeModalBtn.addEventListener('click', closeConfig);
-  cancelModalBtn.addEventListener('click', closeConfig);
-  configModal.addEventListener('click', (e) => { if (e.target === configModal) closeConfig(); });
-  closePairBtn.addEventListener('click', closePair);
-  pairModal.addEventListener('click', (e) => { if (e.target === pairModal) closePair(); });
-
-  // ===== Guardar configuración =====
-  subbotForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const phone = $('#phone').value.trim();
-    const name = $('#name').value.trim() || 'Filmverso Subbot';
-    const prefix = $('#prefix').value.trim() || '.';
-    const status = $('#statusText').value.trim() || 'Activo con FILMVERSO-ZYON';
-
-    console.log('📦 Datos guardados:', { phone, name, prefix, status });
-    
-    // Pre-cargar el número en el campo de vinculación
-    pairPhone.value = phone;
-    
-    emptyState.style.display = 'none';
-    closeConfig();
-    openPair();
-    
-    // Intentar generar el QR automáticamente al abrir
-    setTimeout(fetchQR, 1000);
-  });
-
-  // ===== Pestañas =====
-  const tabButtons = $$('[data-tab]');
-  const panels = {
-    code: $('#panelCode'),
-    qr: $('#panelQr'),
-  };
-
-  tabButtons.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      tabButtons.forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      const tab = btn.dataset.tab;
-      Object.keys(panels).forEach((key) => {
-        panels[key].classList.toggle('active', key === tab);
-      });
-    });
-  });
-
-  // ===== Función para obtener el QR =====
-  async function fetchQR() {
-    try {
-      const response = await fetch('/api/qr');
-      const data = await response.json();
-      
-      if (data.qr) {
-        qrBox.innerHTML = `
-          <div style="text-align:center;">
-            <img src="${data.qr}" alt="Código QR" style="max-width:200px;border-radius:12px;background:white;padding:10px;" />
-            <div style="margin-top:0.8rem;font-size:0.85rem;color:#7a8ba3;">
-              Escanea con WhatsApp
+          <div class="form-group">
+            <label for="name">Nombre del Sub-Bot</label>
+            <input type="text" id="name" maxlength="40" value="Filmverso Subbot" required />
+            <div class="brand-preview">
+              <strong id="brandPreview">Filmverso Subbot | Made With © FILMVERSO-ZYON</strong>
             </div>
           </div>
-        `;
-      } else {
-        qrBox.innerHTML = `
-          <div style="text-align:center;color:#6a7b8d;">
-            <div style="font-size:2rem;margin-bottom:0.5rem;">⏳</div>
-            ${data.error || 'Generando QR...'}
+          <div class="form-group">
+            <label for="prefix">Prefijo</label>
+            <input type="text" id="prefix" maxlength="4" value="." required />
           </div>
-        `;
-      }
-    } catch (error) {
-      console.error('Error al obtener QR:', error);
-      qrBox.innerHTML = `
-        <div style="text-align:center;color:#e74c3c;">
-          Error al cargar el QR. Intenta de nuevo.
+          <div class="form-group">
+            <label for="statusText">Estado interno</label>
+            <input type="text" id="statusText" maxlength="139" placeholder="Activo con FILMVERSO-ZYON" />
+          </div>
+          <div class="switch-row">
+            <input type="checkbox" id="autoRead" />
+            <label for="autoRead">Lectura automática</label>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" id="cancelModalBtn">Cancelar</button>
+            <button type="submit" class="btn-primary">Guardar cambios</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL: VINCULACIÓN -->
+    <div class="modal-overlay" id="pairModal">
+      <div class="modal-card">
+        <header>
+          <div>
+            <span class="eyebrow">VINCULACIÓN</span>
+            <h2>Conectar WhatsApp</h2>
+          </div>
+          <button class="modal-close" id="closePairBtn">×</button>
+        </header>
+        <div class="pair-tabs">
+          <button class="active" data-tab="code">Código</button>
+          <button data-tab="qr">QR</button>
         </div>
-      `;
-    }
-  }
+        <!-- Panel Código -->
+        <div class="pair-panel active" id="panelCode">
+          <p>Ingresa tu número y genera un código para vincularlo en WhatsApp.</p>
+          <div style="display:flex;gap:0.5rem;margin-bottom:1rem;">
+            <input type="text" id="pairPhone" placeholder="51912345678"
+            style="flex:1;padding:0.7rem 1rem;background:#0f151e;border:1px solid #2f3b4a;border-radius:12px;color:#e8edf5;" />
+            <button class="btn-primary" id="generateCodeBtn">Generar</button>
+          </div>
+          <output class="pair-code" id="pairCode">— — — — — — — —</output>
+          <p style="margin-top:0.8rem;font-size:0.8rem;color:#7a8ba3;">Ve a WhatsApp → Dispositivos vinculados → Vincular con código de 8 dígitos</p>
+        </div>
+        <!-- Panel QR -->
+        <div class="pair-panel" id="panelQr">
+          <p>Escanea este código desde WhatsApp.</p>
+          <button class="btn-primary" id="generateQrBtn">Actualizar QR</button>
+          <div class="qr-box" id="qrBox">
+            <div style="text-align:center;color:#6a7b8d;">
+              <div style="font-size:2rem;margin-bottom:0.5rem;">📷</div>
+              Esperando QR...
+            </div>
+          </div>
+          <p style="margin-top:0.8rem;font-size:0.8rem;color:#7a8ba3;">Ve a WhatsApp → Dispositivos vinculados → Vincular con código QR</p>
+        </div>
+      </div>
+    </div>
 
-  // ===== Generar código de vinculación =====
-  generateCodeBtn.addEventListener('click', async () => {
-    const phone = pairPhone.value.trim();
-    if (!phone) {
-      alert('Por favor, ingresa tu número de WhatsApp');
-      return;
-    }
+  </div>
 
-    pairCode.textContent = '⏳ Generando...';
-    pairCode.style.color = '#f0c060';
+  <script>
+    // ============================================================
+    //  INTERACCIÓN COMPLETA (modales, pestañas, llamadas a la API)
+    // ============================================================
 
-    try {
-      const response = await fetch('/api/pair', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phoneNumber: phone })
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => document.querySelectorAll(sel);
+
+    // --- Elementos ---
+    const emptyState = $('#emptyState');
+    const configModal = $('#configModal');
+    const pairModal = $('#pairModal');
+    const openModalBtn = $('#openModalBtn');
+    const emptyCreateBtn = $('#emptyCreateBtn');
+    const closeModalBtn = $('#closeModalBtn');
+    const cancelModalBtn = $('#cancelModalBtn');
+    const closePairBtn = $('#closePairBtn');
+    const subbotForm = $('#subbotForm');
+    const generateCodeBtn = $('#generateCodeBtn');
+    const generateQrBtn = $('#generateQrBtn');
+    const pairCode = $('#pairCode');
+    const qrBox = $('#qrBox');
+    const pairPhone = $('#pairPhone');
+
+    // --- Abrir/cerrar modales ---
+    function openConfig() { configModal.classList.add('open'); }
+    function closeConfig() { configModal.classList.remove('open'); }
+    function openPair() { pairModal.classList.add('open'); }
+    function closePair() { pairModal.classList.remove('open'); }
+
+    openModalBtn.addEventListener('click', openConfig);
+    emptyCreateBtn.addEventListener('click', openConfig);
+    closeModalBtn.addEventListener('click', closeConfig);
+    cancelModalBtn.addEventListener('click', closeConfig);
+    configModal.addEventListener('click', (e) => { if (e.target === configModal) closeConfig(); });
+    closePairBtn.addEventListener('click', closePair);
+    pairModal.addEventListener('click', (e) => { if (e.target === pairModal) closePair(); });
+
+    // --- Guardar configuración ---
+    subbotForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const phone = $('#phone').value.trim();
+      const name = $('#name').value.trim() || 'Filmverso Subbot';
+      const prefix = $('#prefix').value.trim() || '.';
+      const status = $('#statusText').value.trim() || 'Activo con FILMVERSO-ZYON';
+
+      console.log('📦 Datos guardados:', { phone, name, prefix, status });
+
+      // Pre-cargar el número en el campo de vinculación
+      pairPhone.value = phone;
+
+      emptyState.style.display = 'none';
+      closeConfig();
+      openPair();
+
+      // Intentar generar el QR automáticamente al abrir
+      setTimeout(fetchQR, 1000);
+    });
+
+    // --- Pestañas ---
+    const tabButtons = $$('[data-tab]');
+    const panels = {
+      code: $('#panelCode'),
+      qr: $('#panelQr'),
+    };
+
+    tabButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        tabButtons.forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        const tab = btn.dataset.tab;
+        Object.keys(panels).forEach((key) => {
+          panels[key].classList.toggle('active', key === tab);
+        });
       });
-      
-      const data = await response.json();
-      
-      if (data.pairingCode) {
-        pairCode.textContent = data.pairingCode;
-        pairCode.style.color = '#2ecc71';
-      } else {
-        pairCode.textContent = '❌ ' + (data.error || 'Error al generar el código');
-        pairCode.style.color = '#e74c3c';
-      }
-    } catch (error) {
-      console.error('Error al generar código:', error);
-      pairCode.textContent = '❌ Error de conexión';
-      pairCode.style.color = '#e74c3c';
-    }
-  });
+    });
 
-  // ===== Actualizar QR =====
-  generateQrBtn.addEventListener('click', fetchQR);
+    // --- Función para obtener el QR ---
+    async function fetchQR() {
+      try {
+        const response = await fetch('/api/qr');
+        const data = await response.json();
 
-  // ===== Cerrar con Escape =====
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      if (configModal.classList.contains('open')) closeConfig();
-      if (pairModal.classList.contains('open')) closePair();
-    }
-  });
-
-  // ===== Verificar estado de la conexión cada 10 segundos =====
-  async function checkStatus() {
-    try {
-      const response = await fetch('/api/status');
-      const data = await response.json();
-      
-      if (data.connected) {
-        // Si ya está conectado, cerramos el modal de vinculación
-        if (pairModal.classList.contains('open')) {
-          // Mostrar un mensaje de éxito
+        if (data.qr) {
           qrBox.innerHTML = `
-            <div style="text-align:center;color:#2ecc71;">
-              <div style="font-size:3rem;margin-bottom:0.5rem;">✅</div>
-              <strong>¡Conectado exitosamente!</strong>
-              <div style="margin-top:0.5rem;font-size:0.85rem;color:#7a8ba3;">
-                Tu bot ya está activo.
+            <div style="text-align:center;">
+              <img src="${data.qr}" alt="Código QR" />
+              <div style="margin-top:0.8rem;font-size:0.85rem;color:#7a8ba3;">
+                Escanea con WhatsApp
               </div>
             </div>
           `;
-          pairCode.textContent = '✅ CONECTADO';
-          pairCode.style.color = '#2ecc71';
+        } else {
+          qrBox.innerHTML = `
+            <div style="text-align:center;color:#6a7b8d;">
+              <div style="font-size:2rem;margin-bottom:0.5rem;">⏳</div>
+              ${data.error || 'Generando QR...'}
+            </div>
+          `;
         }
+      } catch (error) {
+        console.error('Error al obtener QR:', error);
+        qrBox.innerHTML = `
+          <div style="text-align:center;color:#e74c3c;">
+            Error al cargar el QR. Intenta de nuevo.
+          </div>
+        `;
       }
-    } catch (error) {
-      // Silencioso
     }
-  }
 
-  setInterval(checkStatus, 10000);
-</script>
+    // --- Generar código de vinculación ---
+    generateCodeBtn.addEventListener('click', async () => {
+      const phone = pairPhone.value.trim();
+      if (!phone) {
+        alert('Por favor, ingresa tu número de WhatsApp');
+        return;
+      }
+
+      pairCode.textContent = '⏳ Generando...';
+      pairCode.style.color = '#f0c060';
+
+      try {
+        const response = await fetch('/api/pair', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phoneNumber: phone })
+        });
+
+        const data = await response.json();
+
+        if (data.pairingCode) {
+          pairCode.textContent = data.pairingCode;
+          pairCode.style.color = '#2ecc71';
+        } else {
+          pairCode.textContent = '❌ ' + (data.error || 'Error al generar el código');
+          pairCode.style.color = '#e74c3c';
+        }
+      } catch (error) {
+        console.error('Error al generar código:', error);
+        pairCode.textContent = '❌ Error de conexión';
+        pairCode.style.color = '#e74c3c';
+      }
+    });
+
+    // --- Actualizar QR manualmente ---
+    generateQrBtn.addEventListener('click', fetchQR);
+
+    // --- Cerrar con Escape ---
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (configModal.classList.contains('open')) closeConfig();
+        if (pairModal.classList.contains('open')) closePair();
+      }
+    });
+
+    // --- Verificar estado de la conexión cada 10 segundos ---
+    async function checkStatus() {
+      try {
+        const response = await fetch('/api/status');
+        const data = await response.json();
+
+        if (data.connected) {
+          // Si ya está conectado, mostramos mensaje de éxito
+          if (pairModal.classList.contains('open')) {
+            qrBox.innerHTML = `
+              <div style="text-align:center;color:#2ecc71;">
+                <div style="font-size:3rem;margin-bottom:0.5rem;">✅</div>
+                <strong>¡Conectado exitosamente!</strong>
+                <div style="margin-top:0.5rem;font-size:0.85rem;color:#7a8ba3;">
+                  Tu bot ya está activo.
+                </div>
+              </div>
+            `;
+            pairCode.textContent = '✅ CONECTADO';
+            pairCode.style.color = '#2ecc71';
+          }
+        }
+      } catch (error) {
+        // Silencioso
+      }
+    }
+
+    setInterval(checkStatus, 10000);
+  </script>
 </body>
 </html>
