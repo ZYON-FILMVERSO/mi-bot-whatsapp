@@ -47,7 +47,7 @@ async function getAIResponse(userMessage, chatHistory = []) {
         // Llamar a la API de Groq
         const chatCompletion = await groq.chat.completions.create({
             messages: messages,
-            model: "llama3-70b-8192", // Modelo rápido y potente
+            model: "model: "llama-3.3-70b-versatile", // Modelo rápido y potente
             temperature: 0.9,          // Creatividad alta
             max_tokens: 180,           // Respuestas cortas y directas
             top_p: 0.95,
