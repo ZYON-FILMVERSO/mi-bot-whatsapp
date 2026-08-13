@@ -3,51 +3,45 @@ const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = requi
 const { Boom } = require('@hapi/boom');
 const QRCode = require('qrcode');
 const path = require('path');
-const fs = require('fs');
+
+// Importamos nuestra IA desde la carpeta modules
+const { getAIResponse } = require('./modules/ai');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Middleware para servir archivos estáticos (HTML, CSS, JS)
+// Middlewares
 app.use(express.static('public'));
+app.use(express.json());
 
-// Variable para almacenar el último QR o código de vinculación generado
+// --- Variables del bot ---
 let lastQR = null;
 let lastPairingCode = null;
-let phoneNumberForPairing = null;
+let sock = null;
 
-// Función principal para iniciar el socket de WhatsApp
+// --- Función para iniciar WhatsApp ---
 async function startSock() {
-    // Cargar o crear el estado de autenticación
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
-    const sock = makeWASocket({
+    sock = makeWASocket({
         auth: state,
-        printQRInTerminal: false, // No lo imprimimos en consola, lo mostraremos en la web
+        printQRInTerminal: false,
         browser: ['FILMVERSO-ZYON', 'Chrome', '1.0.0']
     });
 
-    // Escuchar eventos de actualización de la conexión
+    // Eventos de conexión
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
-
-        // Si se genera un QR, lo guardamos para mostrarlo en la web
         if (qr) {
             console.log('🔑 Nuevo QR generado');
             lastQR = qr;
-            // Limpiar el código de vinculación anterior si existe
             lastPairingCode = null;
         }
-
-        // Si la conexión se abre, estamos listos
         if (connection === 'open') {
             console.log('✅ Bot conectado exitosamente a WhatsApp');
-            // Limpiar QR y código de vinculación porque ya no son necesarios
             lastQR = null;
             lastPairingCode = null;
         }
-
-        // Si la conexión se cierra, intentamos reconectar
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
             console.log('⚠️ Conexión cerrada, reconectando...', shouldReconnect);
@@ -59,25 +53,44 @@ async function startSock() {
         }
     });
 
-    // Guardar las credenciales cuando se actualicen
     sock.ev.on('creds.update', saveCreds);
+
+    // --- ESCUCHAR MENSAJES (Aquí usamos la IA importada) ---
+    sock.ev.on('messages.upsert', async (m) => {
+        const msg = m.messages[0];
+        if (!msg.message || msg.key.fromMe) return;
+
+        const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+        const sender = msg.key.remoteJid;
+
+        // Detectar palabras clave: IA, Zyon, bot (sin importar mayúsculas)
+        if (text && /IA|Zyon|bot/i.test(text)) {
+            console.log(`🤖 Mensaje para la IA de ${sender}: ${text}`);
+            
+            // Indicar que está escribiendo
+            await sock.sendPresenceUpdate('composing', sender);
+
+            // Obtener respuesta de la IA (desde el módulo externo)
+            const aiResponse = await getAIResponse(text);
+
+            // Enviar respuesta
+            await sock.sendMessage(sender, { text: aiResponse });
+            console.log(`💬 Respuesta de IA enviada a ${sender}`);
+        }
+    });
 
     return sock;
 }
 
 // Iniciar el bot
-let sock = null;
-startSock().then(s => { sock = s; });
+startSock();
 
-// --- ENDPOINTS DE LA API ---
-
-// Endpoint para obtener el QR en formato imagen
+// --- ENDPOINTS PARA LA WEB ---
 app.get('/api/qr', async (req, res) => {
     if (!lastQR) {
         return res.status(404).json({ error: 'No hay QR disponible. Espera a que se genere.' });
     }
     try {
-        // Generar la imagen del QR en formato data URL
         const qrImage = await QRCode.toDataURL(lastQR);
         res.json({ qr: qrImage });
     } catch (error) {
@@ -86,34 +99,23 @@ app.get('/api/qr', async (req, res) => {
     }
 });
 
-// Endpoint para solicitar un código de vinculación (Pairing Code)
 app.post('/api/pair', express.json(), async (req, res) => {
     const { phoneNumber } = req.body;
     if (!phoneNumber) {
         return res.status(400).json({ error: 'El número de teléfono es requerido' });
     }
-
-    // Limpiar el número (solo dígitos)
     const cleanNumber = phoneNumber.replace(/\D/g, '');
     if (cleanNumber.length < 10) {
         return res.status(400).json({ error: 'Número de teléfono inválido' });
     }
-
     try {
-        // Si no hay socket, intentamos crearlo
         if (!sock) {
             sock = await startSock();
         }
-
-        // Solicitar el código de vinculación
         const code = await sock.requestPairingCode(cleanNumber);
         console.log(`📱 Código de vinculación para ${cleanNumber}: ${code}`);
-        
-        // Guardar el código para mostrarlo
         lastPairingCode = code;
-        // Limpiar QR anterior
         lastQR = null;
-        
         res.json({ pairingCode: code });
     } catch (error) {
         console.error('Error al generar código de vinculación:', error);
@@ -121,22 +123,19 @@ app.post('/api/pair', express.json(), async (req, res) => {
     }
 });
 
-// Endpoint para verificar el estado de la conexión
 app.get('/api/status', (req, res) => {
     const isConnected = sock?.authState?.creds?.registered || false;
-    res.json({ 
+    res.json({
         connected: isConnected,
         hasQR: !!lastQR,
         hasPairingCode: !!lastPairingCode
     });
 });
 
-// Servir la página principal (opcional, si quieres que sirva el HTML desde el backend)
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Iniciar el servidor
 app.listen(port, () => {
     console.log(`🚀 Servidor corriendo en http://localhost:${port}`);
     console.log('📱 Conectando a WhatsApp...');
