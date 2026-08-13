@@ -21,37 +21,45 @@ Eres 100% peruano, nacido y criado en Lima. Tienes un carisma único, eres calle
 /**
  * Función para obtener una respuesta de la IA.
  * @param {string} userMessage - El mensaje del usuario.
- * @param {Array} chatHistory - Historial opcional de la conversación.
+ * @param {Array} chatHistory - Historial opcional de la conversación (máximo 5 mensajes para evitar exceder tokens).
  * @returns {Promise<string>} - La respuesta generada.
  */
 async function getAIResponse(userMessage, chatHistory = []) {
     // Verificar que la API Key esté configurada
     if (!process.env.GROQ_API_KEY) {
+        console.error('❌ GROQ_API_KEY no está configurada en las variables de entorno.');
         return '🚫 No tengo mi clave de API configurada. Pídele a @Elvis28_ que agregue GROQ_API_KEY en Render.';
     }
 
     try {
-        // Construir el mensaje para la API
+        // Limitar el historial a los últimos 5 mensajes para no sobrecargar
+        const limitedHistory = chatHistory.slice(-5);
+
+        // Construir los mensajes para la API
         const messages = [
             { role: 'system', content: SYSTEM_PROMPT },
-            ...chatHistory,
+            ...limitedHistory,
             { role: 'user', content: userMessage }
         ];
 
-        // Llamar a la API de Groq (modelo rápido y potente)
+        console.log(`📤 Enviando consulta a Groq: "${userMessage}"`);
+
+        // Llamar a la API de Groq
         const chatCompletion = await groq.chat.completions.create({
             messages: messages,
-            model: "llama3-70b-8192",
-            temperature: 0.9,
-            max_tokens: 180,
+            model: "llama3-70b-8192", // Modelo rápido y potente
+            temperature: 0.9,          // Creatividad alta
+            max_tokens: 180,           // Respuestas cortas y directas
             top_p: 0.95,
         });
 
         const response = chatCompletion.choices[0]?.message?.content || 'Ay, causa, no sé qué decirte.';
+        console.log(`📥 Respuesta de Groq: "${response}"`);
         return response;
 
     } catch (error) {
         console.error('❌ Error al llamar a Groq:', error);
+        // Mensaje de error amigable para el usuario
         return 'Uy, me falló el cerebro :( Mejor avísale a @Elvis28_ que revise los logs.';
     }
 }
