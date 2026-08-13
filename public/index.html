@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mis Sub-Bots — FILMVERSO-ZYON</title>
+  <style>
+    /* Aquí van todos los estilos que ya teníamos */
+    /* ... (copia los estilos del código anterior) ... */
+  </style>
+</head>
+<body>
+<div class="dashboard">
+
+  <!-- CABECERA -->
+  <section class="panel hero">
+    <div>
+      <span class="eyebrow">🤖 FILMVERSO-ZYON</span>
+      <h1>Mis Sub-Bots</h1>
+      <p>Vincula tu WhatsApp y personaliza la identidad de tu Sub-Bot.</p>
+    </div>
+    <button class="btn-primary" id="openModalBtn">＋ Nuevo Sub-Bot</button>
+  </section>
+
+  <!-- ESTADO VACÍO -->
+  <section class="panel empty-state" id="emptyState">
+    <span class="emoji-big">🎬</span>
+    <h2>Aún no tienes un Sub-Bot</h2>
+    <p>Tu cuenta permite crear 1 Sub-Bot.</p>
+    <button class="btn-primary" id="emptyCreateBtn">Crear mi Sub-Bot</button>
+  </section>
+
+  <!-- MODAL: CONFIGURACIÓN -->
+  <div class="modal-overlay" id="configModal">
+    <div class="modal-card">
+      <header>
+        <div>
+          <span class="eyebrow">CONFIGURACIÓN</span>
+          <h2 id="modalTitle">Nuevo Sub-Bot</h2>
+        </div>
+        <button class="modal-close" id="closeModalBtn">×</button>
+      </header>
+      <form id="subbotForm">
+        <div class="form-group">
+          <label for="phone">Número de WhatsApp</label>
+          <input type="text" id="phone" inputmode="numeric" placeholder="51912345678" required />
+          <small>Incluye código del país, solo números.</small>
+        </div>
+        <div class="form-group">
+          <label for="name">Nombre del Sub-Bot</label>
+          <input type="text" id="name" maxlength="40" value="Filmverso Subbot" required />
+          <div class="brand-preview">
+            <strong id="brandPreview">Filmverso Subbot | Made With © FILMVERSO-ZYON</strong>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="prefix">Prefijo</label>
+          <input type="text" id="prefix" maxlength="4" value="." required />
+        </div>
+        <div class="form-group">
+          <label for="statusText">Estado interno</label>
+          <input type="text" id="statusText" maxlength="139" placeholder="Activo con FILMVERSO-ZYON" />
+        </div>
+        <div class="switch-row">
+          <input type="checkbox" id="autoRead" />
+          <label for="autoRead">Lectura automática</label>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancelModalBtn">Cancelar</button>
+          <button type="submit" class="btn-primary">Guardar cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: VINCULACIÓN -->
+  <div class="modal-overlay" id="pairModal">
+    <div class="modal-card">
+      <header>
+        <div>
+          <span class="eyebrow">VINCULACIÓN</span>
+          <h2>Conectar WhatsApp</h2>
+        </div>
+        <button class="modal-close" id="closePairBtn">×</button>
+      </header>
+      <div class="pair-tabs">
+        <button class="active" data-tab="code">Código</button>
+        <button data-tab="qr">QR</button>
+      </div>
+      <!-- Panel Código -->
+      <div class="pair-panel active" id="panelCode">
+        <p>Ingresa tu número y genera un código para vincularlo en WhatsApp.</p>
+        <div style="display:flex;gap:0.5rem;margin-bottom:1rem;">
+          <input type="text" id="pairPhone" placeholder="51912345678" style="flex:1;padding:0.7rem 1rem;background:#0f151e;border:1px solid #2f3b4a;border-radius:12px;color:#e8edf5;" />
+          <button class="btn-primary" id="generateCodeBtn">Generar</button>
+        </div>
+        <output class="pair-code" id="pairCode">— — — — — — — —</output>
+        <p style="margin-top:0.8rem;font-size:0.8rem;color:#7a8ba3;">Ve a WhatsApp → Dispositivos vinculados → Vincular con código de 8 dígitos</p>
+      </div>
+      <!-- Panel QR -->
+      <div class="pair-panel" id="panelQr">
+        <p>Escanea este código desde WhatsApp.</p>
+        <button class="btn-primary" id="generateQrBtn">Actualizar QR</button>
+        <div class="qr-box" id="qrBox">
+          <div style="text-align:center;color:#6a7b8d;">
+            <div style="font-size:2rem;margin-bottom:0.5rem;">📷</div>
+            Esperando QR...
+          </div>
+        </div>
+        <p style="margin-top:0.8rem;font-size:0.8rem;color:#7a8ba3;">Ve a WhatsApp → Dispositivos vinculados → Vincular con código QR</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ===== Elementos del DOM =====
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => document.querySelectorAll(sel);
+
+  const emptyState = $('#emptyState');
+  const configModal = $('#configModal');
+  const pairModal = $('#pairModal');
+  const openModalBtn = $('#openModalBtn');
+  const emptyCreateBtn = $('#emptyCreateBtn');
+  const closeModalBtn = $('#closeModalBtn');
+  const cancelModalBtn = $('#cancelModalBtn');
+  const closePairBtn = $('#closePairBtn');
+  const subbotForm = $('#subbotForm');
+  const generateCodeBtn = $('#generateCodeBtn');
+  const generateQrBtn = $('#generateQrBtn');
+  const pairCode = $('#pairCode');
+  const qrBox = $('#qrBox');
+  const pairPhone = $('#pairPhone');
+
+  // ===== Abrir/Cerrar modales =====
+  function openConfig() { configModal.classList.add('open'); }
+  function closeConfig() { configModal.classList.remove('open'); }
+  function openPair() { pairModal.classList.add('open'); }
+  function closePair() { pairModal.classList.remove('open'); }
+
+  openModalBtn.addEventListener('click', openConfig);
+  emptyCreateBtn.addEventListener('click', openConfig);
+  closeModalBtn.addEventListener('click', closeConfig);
+  cancelModalBtn.addEventListener('click', closeConfig);
+  configModal.addEventListener('click', (e) => { if (e.target === configModal) closeConfig(); });
+  closePairBtn.addEventListener('click', closePair);
+  pairModal.addEventListener('click', (e) => { if (e.target === pairModal) closePair(); });
+
+  // ===== Guardar configuración =====
+  subbotForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const phone = $('#phone').value.trim();
+    const name = $('#name').value.trim() || 'Filmverso Subbot';
+    const prefix = $('#prefix').value.trim() || '.';
+    const status = $('#statusText').value.trim() || 'Activo con FILMVERSO-ZYON';
+
+    console.log('📦 Datos guardados:', { phone, name, prefix, status });
+    
+    // Pre-cargar el número en el campo de vinculación
+    pairPhone.value = phone;
+    
+    emptyState.style.display = 'none';
+    closeConfig();
+    openPair();
+    
+    // Intentar generar el QR automáticamente al abrir
+    setTimeout(fetchQR, 1000);
+  });
+
+  // ===== Pestañas =====
+  const tabButtons = $$('[data-tab]');
+  const panels = {
+    code: $('#panelCode'),
+    qr: $('#panelQr'),
+  };
+
+  tabButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      tabButtons.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = btn.dataset.tab;
+      Object.keys(panels).forEach((key) => {
+        panels[key].classList.toggle('active', key === tab);
+      });
+    });
+  });
+
+  // ===== Función para obtener el QR =====
+  async function fetchQR() {
+    try {
+      const response = await fetch('/api/qr');
+      const data = await response.json();
+      
+      if (data.qr) {
+        qrBox.innerHTML = `
+          <div style="text-align:center;">
+            <img src="${data.qr}" alt="Código QR" style="max-width:200px;border-radius:12px;background:white;padding:10px;" />
+            <div style="margin-top:0.8rem;font-size:0.85rem;color:#7a8ba3;">
+              Escanea con WhatsApp
+            </div>
+          </div>
+        `;
+      } else {
+        qrBox.innerHTML = `
+          <div style="text-align:center;color:#6a7b8d;">
+            <div style="font-size:2rem;margin-bottom:0.5rem;">⏳</div>
+            ${data.error || 'Generando QR...'}
+          </div>
+        `;
+      }
+    } catch (error) {
+      console.error('Error al obtener QR:', error);
+      qrBox.innerHTML = `
+        <div style="text-align:center;color:#e74c3c;">
+          Error al cargar el QR. Intenta de nuevo.
+        </div>
+      `;
+    }
+  }
+
+  // ===== Generar código de vinculación =====
+  generateCodeBtn.addEventListener('click', async () => {
+    const phone = pairPhone.value.trim();
+    if (!phone) {
+      alert('Por favor, ingresa tu número de WhatsApp');
+      return;
+    }
+
+    pairCode.textContent = '⏳ Generando...';
+    pairCode.style.color = '#f0c060';
+
+    try {
+      const response = await fetch('/api/pair', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: phone })
+      });
+      
+      const data = await response.json();
+      
+      if (data.pairingCode) {
+        pairCode.textContent = data.pairingCode;
+        pairCode.style.color = '#2ecc71';
+      } else {
+        pairCode.textContent = '❌ ' + (data.error || 'Error al generar el código');
+        pairCode.style.color = '#e74c3c';
+      }
+    } catch (error) {
+      console.error('Error al generar código:', error);
+      pairCode.textContent = '❌ Error de conexión';
+      pairCode.style.color = '#e74c3c';
+    }
+  });
+
+  // ===== Actualizar QR =====
+  generateQrBtn.addEventListener('click', fetchQR);
+
+  // ===== Cerrar con Escape =====
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (configModal.classList.contains('open')) closeConfig();
+      if (pairModal.classList.contains('open')) closePair();
+    }
+  });
+
+  // ===== Verificar estado de la conexión cada 10 segundos =====
+  async function checkStatus() {
+    try {
+      const response = await fetch('/api/status');
+      const data = await response.json();
+      
+      if (data.connected) {
+        // Si ya está conectado, cerramos el modal de vinculación
+        if (pairModal.classList.contains('open')) {
+          // Mostrar un mensaje de éxito
+          qrBox.innerHTML = `
+            <div style="text-align:center;color:#2ecc71;">
+              <div style="font-size:3rem;margin-bottom:0.5rem;">✅</div>
+              <strong>¡Conectado exitosamente!</strong>
+              <div style="margin-top:0.5rem;font-size:0.85rem;color:#7a8ba3;">
+                Tu bot ya está activo.
+              </div>
+            </div>
+          `;
+          pairCode.textContent = '✅ CONECTADO';
+          pairCode.style.color = '#2ecc71';
+        }
+      }
+    } catch (error) {
+      // Silencioso
+    }
+  }
+
+  setInterval(checkStatus, 10000);
+</script>
+</body>
+</html>
