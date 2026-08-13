@@ -14,10 +14,20 @@ const port = process.env.PORT || 3000;
 app.use(express.static('public'));
 app.use(express.json());
 
-// --- Variables del bot (¡IMPORTANTE: declaradas aquí!) ---
+// --- Variables del bot ---
 let lastQR = null;
 let lastPairingCode = null;
-let sock = null; // <--- ESTA ES LA DECLARACIÓN QUE FALTABA
+let sock = null; 
+
+// 📌 CORRECCIÓN 1: Función para arreglar el JID (el error del @lid)
+const normalizarJid = (jid) => {
+    if (!jid) return jid;
+    // Si termina en @lid, lo cambiamos al formato real de WhatsApp
+    if (jid.endsWith('@lid')) {
+        return jid.replace('@lid', '@s.whatsapp.net');
+    }
+    return jid; // Los grupos (@g.us) se dejan igual
+};
 
 // --- Función para iniciar WhatsApp ---
 async function startSock() {
@@ -55,26 +65,39 @@ async function startSock() {
 
     sock.ev.on('creds.update', saveCreds);
 
-    // --- ESCUCHAR MENSAJES (con logs de depuración) ---
+    // --- ESCUCHAR MENSAJES ---
     sock.ev.on('messages.upsert', async (m) => {
         console.log('📩 Evento messages.upsert recibido');
         const msg = m.messages[0];
         if (!msg.message || msg.key.fromMe) return;
 
         const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
-        const sender = msg.key.remoteJid;
+        
+        // 📌 CORRECCIÓN 2: Aplicamos la normalización del JID aquí
+        let sender = normalizarJid(msg.key.remoteJid);
 
         console.log(`📝 Texto: "${text}" | Remitente: ${sender}`);
 
         if (text && /IA|Zyon|bot/i.test(text)) {
             console.log(`🤖 Mensaje para la IA de ${sender}: ${text}`);
             try {
+                // Enviamos el estado "escribiendo"
                 await sock.sendPresenceUpdate('composing', sender);
+                
+                // Llamamos a la IA
                 const aiResponse = await getAIResponse(text);
+                
+                // Enviamos la respuesta usando el sender ya corregido
                 await sock.sendMessage(sender, { text: aiResponse });
                 console.log(`✅ Respuesta enviada a ${sender}`);
             } catch (error) {
                 console.error('❌ Error al procesar el mensaje:', error);
+                // 📌 CORRECCIÓN 3: Ahora sí enviamos el mensaje de error al usuario
+                try {
+                    await sock.sendMessage(sender, { text: "uy, me falló el cerebro :( mejor avísale a @Elvis28_ que revise los logs." });
+                } catch (sendError) {
+                    console.error("❌ Tampoco pude enviar el mensaje de error al usuario:", sendError);
+                }
             }
         } else {
             console.log('⏭️ El mensaje no contiene palabras clave (IA, Zyon o bot)');
