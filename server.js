@@ -17,31 +17,7 @@ app.use(express.json());
 // --- Variables del bot ---
 let lastQR = null;
 let lastPairingCode = null;
-let sock = null; 
-
-// --- Configuraciones para administración de grupos ---
-const mutedUsers = new Map(); // Guarda usuarios muteados
-const antiLinkGroups = new Set(); // Guarda grupos con Antilink activado
-
-// 📌 Función para arreglar el JID (el error del @lid)
-const normalizarJid = (jid) => {
-    if (!jid) return jid;
-    if (jid.endsWith('@lid')) {
-        return jid.replace('@lid', '@s.whatsapp.net');
-    }
-    return jid;
-};
-
-// 📌 Función para convertir tiempos (ej: 5m, 10h) a milisegundos
-const parseTime = (timeStr) => {
-    const match = timeStr.match(/^(\d+)([mh])$/);
-    if (!match) return null;
-    const value = parseInt(match[1]);
-    const unit = match[2];
-    if (unit === 'm') return value * 60 * 1000; // minutos
-    if (unit === 'h') return value * 60 * 60 * 1000; // horas
-    return null;
-};
+let sock = null;
 
 // --- Función para iniciar WhatsApp ---
 async function startSock() {
@@ -53,6 +29,7 @@ async function startSock() {
         browser: ['FILMVERSO-ZYON', 'Chrome', '1.0.0']
     });
 
+    // Eventos de conexión
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
         if (qr) {
@@ -69,7 +46,7 @@ async function startSock() {
             const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
             console.log('⚠️ Conexión cerrada, reconectando...', shouldReconnect);
             if (shouldReconnect) {
-                setTimeout(() => startSock(), 5000);
+                startSock();
             } else {
                 console.log('❌ Sesión cerrada. Elimina la carpeta auth_info_baileys y reinicia.');
             }
@@ -78,169 +55,51 @@ async function startSock() {
 
     sock.ev.on('creds.update', saveCreds);
 
-    // --- ESCUCHAR MENSAJES ---
+    // --- ESCUCHAR MENSAJES (MEJORADO) ---
     sock.ev.on('messages.upsert', async (m) => {
+        console.log('📩 Evento messages.upsert recibido');
+        const msg = m.messages[0];
+        if (!msg.message || msg.key.fromMe) return;
+
+        const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+        const sender = msg.key.remoteJid;
+        const senderNumber = sender.split('@')[0] || sender;
+        
+        // Detectar si es un grupo (termina en @g.us)
+        const isGroup = sender.endsWith('@g.us');
+        const groupName = isGroup ? msg.pushName || 'grupo' : 'privado';
+
+        console.log(`📝 Texto: "${text}" | Remitente: ${senderNumber} | Grupo: ${isGroup}`);
+
+        // --- FILTRO: Solo responde si es una pregunta o contiene palabras clave ---
+        const isQuestion = /¿|\?|quién|qué|cuándo|dónde|por qué|para qué|cómo|cuánto|IA|Zyon|bot|ZYON|Bot/i.test(text);
+        
+        if (!isQuestion) {
+            console.log('⏭️ No es una pregunta o no contiene palabras clave, ignorando');
+            return;
+        }
+
+        console.log(`🤖 Procesando pregunta de ${senderNumber}: ${text}`);
+
         try {
-            console.log('📩 Evento messages.upsert recibido');
-            const msg = m.messages[0];
-            if (!msg.message || msg.key.fromMe) return;
-
-            const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
-            const sender = normalizarJid(msg.key.remoteJid);
-            const isGroup = sender.endsWith('@g.us');
-
-            console.log(`📝 Texto: "${text}" | Remitente: ${sender}`);
-
-            // --- Lógica específica para grupos ---
-            if (isGroup) {
-                // 1. VERIFICAR SI EL USUARIO ESTÁ MUTEADO
-                const muteKey = `${sender}_${msg.key.participant}`;
-                if (mutedUsers.has(muteKey)) {
-                    const muteData = mutedUsers.get(muteKey);
-                    if (Date.now() > muteData.expiresAt) {
-                        mutedUsers.delete(muteKey);
-                        await sock.sendMessage(sender, { text: `✅ @${msg.key.participant.split('@')[0]} ha sido desmuteado automáticamente.`, mentions: [msg.key.participant] });
-                    } else {
-                        await sock.sendMessage(sender, { delete: msg.key });
-                        await sock.sendMessage(sender, { text: `🚫 Estás muteado. Debes esperar.` });
-                        return; // No procesamos este mensaje
-                    }
+            // Indicar que está escribiendo
+            await sock.sendPresenceUpdate('composing', sender);
+            
+            // Obtener respuesta de la IA (con número y si es grupo)
+            const aiResponse = await getAIResponse(text, senderNumber, isGroup);
+            
+            // Enviar respuesta USANDO LA FUNCIÓN "RESPONDER" DE WHATSAPP
+            await sock.sendMessage(sender, {
+                text: aiResponse,
+                contextInfo: {
+                    quotedMessage: msg.message,
+                    mentionedJid: [sender] // Menciona al usuario
                 }
-
-                // 2. VERIFICAR ANTILINK
-                if (antiLinkGroups.has(sender)) {
-                    const urlRegex = /(https?:\/\/[^\s]+)/gi;
-                    if (urlRegex.test(text)) {
-                        await sock.sendMessage(sender, { delete: msg.key });
-                        await sock.sendMessage(sender, { text: `🚫 ¡Prohibido enviar enlaces!` });
-                        return;
-                    }
-                }
-
-                // 3. COMANDOS DE ADMINISTRACIÓN (SIN PREFIJO)
-                const parts = text.trim().split(/\s+/);
-                const command = parts[0].toLowerCase();
-                const adminCommands = ['mute', 'unmute', 'delete', 'eliminar', 'antilink'];
-
-                if (adminCommands.includes(command)) {
-                    // Verificar si el bot es admin
-                    const groupMeta = await sock.groupMetadata(sender);
-                    const botJid = sock.user.id.split(':')[0] + '@s.whatsapp.net';
-                    const isBotAdmin = groupMeta.participants.find(p => p.id === botJid)?.admin === 'admin';
-
-                    if (!isBotAdmin) {
-                        await sock.sendMessage(sender, { text: '❌ No soy administrador en este grupo. Para usar comandos de administración (mute, unmute, delete, antilink), por favor, conviérteme en administrador.' });
-                        return;
-                    }
-
-                    // Obtener el objetivo (por mención o respuesta)
-                    let targetJid = null;
-                    let targetFromReply = null;
-                    
-                    // Detectar mención
-                    const mentionedJid = msg.message.extendedTextMessage?.contextInfo?.mentionedJid;
-                    // Detectar respuesta a un mensaje
-                    if (msg.message.extendedTextMessage?.contextInfo?.quotedMessage) {
-                        targetFromReply = msg.message.extendedTextMessage.contextInfo.participant;
-                    }
-                    
-                    if (mentionedJid && mentionedJid.length > 0) {
-                        targetJid = mentionedJid[0];
-                    } else if (targetFromReply) {
-                        targetJid = targetFromReply;
-                    }
-
-                    // -- EJECUTAR COMANDOS --
-                    if (command === 'antilink') {
-                        const subCommand = parts[1]?.toLowerCase();
-                        if (subCommand === 'on') {
-                            antiLinkGroups.add(sender);
-                            await sock.sendMessage(sender, { text: '✅ Antilink activado.' });
-                        } else if (subCommand === 'off') {
-                            antiLinkGroups.delete(sender);
-                            await sock.sendMessage(sender, { text: '✅ Antilink desactivado.' });
-                        } else {
-                            await sock.sendMessage(sender, { text: '❌ Usa: `antilink on` o `antilink off`' });
-                        }
-                    } 
-                    else if (command === 'delete' || command === 'eliminar') {
-                        const quotedMsgKey = msg.message.extendedTextMessage?.contextInfo?.stanzaId;
-                        if (!quotedMsgKey) {
-                            await sock.sendMessage(sender, { text: '❌ Responde al mensaje que quieres eliminar.' });
-                            return;
-                        }
-                        const quotedParticipant = msg.message.extendedTextMessage.contextInfo.participant;
-                        const messageToDelete = {
-                            key: { remoteJid: sender, fromMe: false, id: quotedMsgKey, participant: quotedParticipant }
-                        };
-                        await sock.sendMessage(sender, { delete: messageToDelete.key });
-                        await sock.sendMessage(sender, { text: `✅ Mensaje eliminado.` });
-                    } 
-                    else if (command === 'mute' || command === 'unmute') {
-                        if (!targetJid) {
-                            await sock.sendMessage(sender, { text: '❌ Debes mencionar al usuario o responder a su mensaje para mutear/desmutear.' });
-                            return;
-                        }
-
-                        const muteKeyTarget = `${sender}_${targetJid}`;
-
-                        if (command === 'unmute') {
-                            if (mutedUsers.has(muteKeyTarget)) {
-                                mutedUsers.delete(muteKeyTarget);
-                                await sock.sendMessage(sender, { text: `🔊 @${targetJid.split('@')[0]} desmuteado.`, mentions: [targetJid] });
-                            } else {
-                                await sock.sendMessage(sender, { text: `ℹ️ @${targetJid.split('@')[0]} no está muteado.`, mentions: [targetJid] });
-                            }
-                        } else { // Comando mute
-                            // Detectar el tiempo (ej: 5m, 10h)
-                            let timeStr = null;
-                            let duration = Infinity; // Por defecto es indefinido
-                            
-                            for (let i = 1; i < parts.length; i++) {
-                                const parsed = parseTime(parts[i]);
-                                if (parsed !== null) {
-                                    timeStr = parts[i];
-                                    duration = parsed;
-                                    break;
-                                }
-                            }
-
-                            const durationText = timeStr || 'indefinidamente';
-                            mutedUsers.set(muteKeyTarget, { expiresAt: duration === Infinity ? Infinity : Date.now() + duration });
-                            
-                            await sock.sendMessage(sender, { text: `🔇 @${targetJid.split('@')[0]} muteado por ${durationText}.`, mentions: [targetJid] });
-                        }
-                    }
-                    return; // Salimos para que NO se active la IA en un comando
-                }
-            }
-
-            // --- Lógica de la IA (CORREGIDA) ---
-            // Si es un chat privado (no grupo) -> RESPONDE A TODO
-            // Si es un grupo (isGroup true) -> RESPONDE SOLO si contiene IA, Zyon o bot
-            const shouldRunAI = !isGroup || (text && /IA|Zyon|bot/i.test(text));
-
-            if (shouldRunAI) {
-                console.log(`🤖 Mensaje para la IA de ${sender}: ${text}`);
-                try {
-                    await sock.sendPresenceUpdate('composing', sender);
-                    const aiResponse = await getAIResponse(text);
-                    await sock.sendMessage(sender, { text: aiResponse });
-                    console.log(`✅ Respuesta enviada a ${sender}`);
-                } catch (innerError) {
-                    console.error('❌ Error al procesar la IA:', innerError);
-                    try {
-                        await sock.sendMessage(sender, { text: "uy, me falló el cerebro :( mejor avísale a @Elvis28_ que revise los logs." });
-                    } catch (sendError) {
-                        console.error("❌ Tampoco pude enviar el mensaje de error al usuario:", sendError);
-                    }
-                }
-            } else if (isGroup) {
-                console.log('⏭️ Grupo: El mensaje no contiene las palabras clave (IA, Zyon o bot).');
-            }
-
-        } catch (outerError) {
-            console.error('🔥 ERROR CRÍTICO EN EL MANEJADOR DE MENSAJES:', outerError);
+            });
+            
+            console.log(`✅ Respuesta enviada a ${senderNumber}`);
+        } catch (error) {
+            console.error('❌ Error al procesar el mensaje:', error);
         }
     });
 
