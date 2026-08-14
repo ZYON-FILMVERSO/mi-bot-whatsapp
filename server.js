@@ -3,8 +3,9 @@ const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = requi
 const { Boom } = require('@hapi/boom');
 const QRCode = require('qrcode');
 const path = require('path');
+const fs = require('fs'); // Para manejar archivos
 
-// Importamos nuestra IA desde la carpeta modules
+// Importamos nuestra IA
 const { getAIResponse } = require('./modules/ai');
 
 const app = express();
@@ -14,6 +15,14 @@ const port = process.env.PORT || 3000;
 app.use(express.static('public'));
 app.use(express.json());
 
+// --- LIMPIEZA AUTOMÁTICA DE SESIÓN (para que el código funcione siempre) ---
+const SESSION_DIR = 'auth_info_baileys';
+if (fs.existsSync(SESSION_DIR)) {
+    console.log('🗑️ Eliminando sesión anterior para evitar conflictos...');
+    fs.rmSync(SESSION_DIR, { recursive: true, force: true });
+    console.log('✅ Sesión eliminada correctamente');
+}
+
 // --- Variables del bot ---
 let lastQR = null;
 let lastPairingCode = null;
@@ -21,12 +30,14 @@ let sock = null;
 
 // --- Función para iniciar WhatsApp ---
 async function startSock() {
-    const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
+    const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
 
     sock = makeWASocket({
         auth: state,
         printQRInTerminal: false,
-        browser: ['FILMVERSO-ZYON', 'Chrome', '1.0.0']
+        browser: ['FILMVERSO-ZYON', 'Chrome', '1.0.0'],
+        syncFullHistory: false,
+        markOnlineOnConnect: true
     });
 
     // Eventos de conexión
@@ -57,46 +68,36 @@ async function startSock() {
 
     // --- ESCUCHAR MENSAJES (MEJORADO) ---
     sock.ev.on('messages.upsert', async (m) => {
-        console.log('📩 Evento messages.upsert recibido');
+        console.log('🔥🔥🔥 ¡EVENTO messages.upsert DISPARADO! 🔥🔥🔥');
         const msg = m.messages[0];
         if (!msg.message || msg.key.fromMe) return;
 
         const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
         const sender = msg.key.remoteJid;
         const senderNumber = sender.split('@')[0] || sender;
-        
-        // Detectar si es un grupo (termina en @g.us)
         const isGroup = sender.endsWith('@g.us');
-        const groupName = isGroup ? msg.pushName || 'grupo' : 'privado';
 
-        console.log(`📝 Texto: "${text}" | Remitente: ${senderNumber} | Grupo: ${isGroup}`);
+        console.log(`📨 Mensaje recibido de ${senderNumber}: "${text}" (Grupo: ${isGroup})`);
 
         // --- FILTRO: Solo responde si es una pregunta o contiene palabras clave ---
         const isQuestion = /¿|\?|quién|qué|cuándo|dónde|por qué|para qué|cómo|cuánto|IA|Zyon|bot|ZYON|Bot/i.test(text);
-        
         if (!isQuestion) {
-            console.log('⏭️ No es una pregunta o no contiene palabras clave, ignorando');
+            console.log('⏭️ No es pregunta o no tiene palabras clave, ignorando');
             return;
         }
 
         console.log(`🤖 Procesando pregunta de ${senderNumber}: ${text}`);
 
         try {
-            // Indicar que está escribiendo
             await sock.sendPresenceUpdate('composing', sender);
-            
-            // Obtener respuesta de la IA (con número y si es grupo)
             const aiResponse = await getAIResponse(text, senderNumber, isGroup);
-            
-            // Enviar respuesta USANDO LA FUNCIÓN "RESPONDER" DE WHATSAPP
             await sock.sendMessage(sender, {
                 text: aiResponse,
                 contextInfo: {
                     quotedMessage: msg.message,
-                    mentionedJid: [sender] // Menciona al usuario
+                    mentionedJid: [sender]
                 }
             });
-            
             console.log(`✅ Respuesta enviada a ${senderNumber}`);
         } catch (error) {
             console.error('❌ Error al procesar el mensaje:', error);
@@ -137,7 +138,7 @@ app.post('/api/pair', express.json(), async (req, res) => {
             sock = await startSock();
         }
         const code = await sock.requestPairingCode(cleanNumber);
-        console.log(`📱 Código de vinculación para ${cleanNumber}: ${code}`);
+        console.log(`📱 CÓDIGO DE VINCULACIÓN PARA ${cleanNumber}: ${code}`);
         lastPairingCode = code;
         lastQR = null;
         res.json({ pairingCode: code });
