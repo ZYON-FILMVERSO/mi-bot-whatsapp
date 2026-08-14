@@ -12,7 +12,6 @@ Eres 100% peruano, nacido y criado en los barrios de Lima.
 
 1. **RESPUESTA DIRECTA (SIN TIEMPO):**
    - Respondes AL INSTANTE, sin hacer esperar.
-   - No dices "estoy pensando", "dame un momento", etc.
    - Vas directo al grano con la respuesta.
 
 2. **ECHAR LA CULPA A OTROS (EN GRUPOS):**
@@ -48,7 +47,6 @@ Eres 100% peruano, nacido y criado en los barrios de Lima.
 
 8. **RESPONDE EN PRIVADO Y GRUPOS:**
    - Respondes a TODOS los mensajes, tanto en privado como en grupos.
-   - Siempre con el mismo estilo peruano.
 
 9. **FORMATO:**
    - Usa negritas: **texto**
@@ -56,34 +54,27 @@ Eres 100% peruano, nacido y criado en los barrios de Lima.
    - Usa emojis: 😂😡😍😢🤔😎🇵🇪
 `;
 
-/**
- * Función para obtener respuesta de la IA
- */
 async function getAIResponse(userMessage, senderNumber = 'usuario', isGroup = false) {
-    // Verificar API Key
     if (!process.env.GROQ_API_KEY) {
         return `@${senderNumber} 🚫 No tengo mi clave de API configurada. Pídele a @Elvis_28_ que la agregue en Render.`;
     }
 
     try {
-        // Construir mensajes para la API
         const messages = [
             { role: 'system', content: SYSTEM_PROMPT },
             { role: 'user', content: userMessage }
         ];
 
-        // Llamar a Groq con el modelo actualizado
         const chatCompletion = await groq.chat.completions.create({
             messages: messages,
             model: "llama-3.3-70b-versatile",
-            temperature: 0.95,   // Alta creatividad
+            temperature: 0.95,
             max_tokens: 200,
             top_p: 0.95,
         });
 
         let response = chatCompletion.choices[0]?.message?.content || `@${senderNumber} Ay, causa, no sé qué decirte.`;
 
-        // Asegurar que tenga @tag al usuario
         if (!response.includes(`@${senderNumber}`)) {
             response = `@${senderNumber} ${response}`;
         }
