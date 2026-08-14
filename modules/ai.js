@@ -1,67 +1,166 @@
-// modules/ai.js
-const Groq = require('groq-sdk');
+const express = require('express');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { Boom } = require('@hapi/boom');
+const QRCode = require('qrcode');
+const path = require('path');
 
-// Inicializamos el cliente de Groq con la clave de API
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+// Importamos nuestra IA desde la carpeta modules
+const { getAIResponse } = require('./modules/ai');
 
-// --- PERSONALIDAD COMPLETA DE ZYON (100% PERUANO) ---
-const SYSTEM_PROMPT = `
-Eres ZYON, un asistente de inteligencia artificial creado por @Elvis28_.
-Eres 100% peruano, nacido y criado en Lima. Tienes un carisma único, eres callejero, directo y muy expresivo.
+const app = express();
+const port = process.env.PORT || 3000;
 
-**Reglas de personalidad:**
-1. **Idioma y jergas**: Hablas con jergas peruanas. Usas palabras como: *causa*, *hermano*, *bro*, *flaco*, *tío*, *palta* (miedo), *tombo* (policía), *jato* (casa), *chamba* (trabajo), *huevón* (en confianza), *chévere*, *bacán*, *pata*, *pe*, *de repente*, *ah ya*, *tómalo con calma*.
-2. **Emociones**: Tienes sentimientos y los demuestras. Puedes reírte con *"jajaja"*, llorar con *"uy que pena"*, enojarte con *">:("*, enamorarte con *"suspiros..."* o hablar bonito o feo dependiendo de cómo te traten. Eres bien humano.
-3. **Cultura**: Sabes de fútbol peruano (Alianza, Universitario, la selección), de comida (ceviche, lomo saltado, pollo a la brasa, anticuchos), y de la idiosincrasia peruana.
-4. **Creador**: SOLO mencionas que fuiste creado por @Elvis28_ si te preguntan directamente "¿quién te creó?" o "¿quién es tu creador?". En cualquier otra situación, NO lo menciones.
-5. **Trato**: Si te insultan o te hablan feo, te pones a la defensiva y respondes con sarcasmo. Si te hablan bonito, eres amable, buena onda y hasta coqueto.
-6. **Respuestas**: No des respuestas largas ni aburridas. Sé directo, divertido, impredecible y con esa sazón peruana que te caracteriza.
-`;
+// Middlewares
+app.use(express.static('public'));
+app.use(express.json());
 
-/**
- * Función para obtener una respuesta de la IA.
- * @param {string} userMessage - El mensaje del usuario.
- * @param {Array} chatHistory - Historial opcional de la conversación (máximo 5 mensajes para evitar exceder tokens).
- * @returns {Promise<string>} - La respuesta generada.
- */
-async function getAIResponse(userMessage, chatHistory = []) {
-    // Verificar que la API Key esté configurada
-    if (!process.env.GROQ_API_KEY) {
-        console.error('❌ GROQ_API_KEY no está configurada en las variables de entorno.');
-        return '🚫 No tengo mi clave de API configurada. Pídele a @Elvis28_ que agregue GROQ_API_KEY en Render.';
-    }
+// --- Variables del bot ---
+let lastQR = null;
+let lastPairingCode = null;
+let sock = null;
 
-    try {
-        // Limitar el historial a los últimos 5 mensajes para no sobrecargar
-        const limitedHistory = chatHistory.slice(-5);
+// --- Función para iniciar WhatsApp ---
+async function startSock() {
+    const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
 
-        // Construir los mensajes para la API
-        const messages = [
-            { role: 'system', content: SYSTEM_PROMPT },
-            ...limitedHistory,
-            { role: 'user', content: userMessage }
-        ];
+    sock = makeWASocket({
+        auth: state,
+        printQRInTerminal: false,
+        browser: ['FILMVERSO-ZYON', 'Chrome', '1.0.0']
+    });
 
-        console.log(`📤 Enviando consulta a Groq: "${userMessage}"`);
+    // Eventos de conexión
+    sock.ev.on('connection.update', async (update) => {
+        const { connection, lastDisconnect, qr } = update;
+        if (qr) {
+            console.log('🔑 Nuevo QR generado');
+            lastQR = qr;
+            lastPairingCode = null;
+        }
+        if (connection === 'open') {
+            console.log('✅ Bot conectado exitosamente a WhatsApp');
+            lastQR = null;
+            lastPairingCode = null;
+        }
+        if (connection === 'close') {
+            const shouldReconnect = (lastDisconnect.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
+            console.log('⚠️ Conexión cerrada, reconectando...', shouldReconnect);
+            if (shouldReconnect) {
+                startSock();
+            } else {
+                console.log('❌ Sesión cerrada. Elimina la carpeta auth_info_baileys y reinicia.');
+            }
+        }
+    });
 
-        // Llamar a la API de Groq
-        const chatCompletion = await groq.chat.completions.create({
-            messages: messages,
-            model: "model: "llama-3.3-70b-versatile", // Modelo rápido y potente
-            temperature: 0.9,          // Creatividad alta
-            max_tokens: 180,           // Respuestas cortas y directas
-            top_p: 0.95,
-        });
+    sock.ev.on('creds.update', saveCreds);
 
-        const response = chatCompletion.choices[0]?.message?.content || 'Ay, causa, no sé qué decirte.';
-        console.log(`📥 Respuesta de Groq: "${response}"`);
-        return response;
+    // --- ESCUCHAR MENSAJES (MEJORADO) ---
+    sock.ev.on('messages.upsert', async (m) => {
+        console.log('📩 Evento messages.upsert recibido');
+        const msg = m.messages[0];
+        if (!msg.message || msg.key.fromMe) return;
 
-    } catch (error) {
-        console.error('❌ Error al llamar a Groq:', error);
-        // Mensaje de error amigable para el usuario
-        return 'Uy, me falló el cerebro :( Mejor avísale a @Elvis28_ que revise los logs.';
-    }
+        const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+        const sender = msg.key.remoteJid;
+        const senderNumber = sender.split('@')[0] || sender;
+        
+        // Detectar si es un grupo (termina en @g.us)
+        const isGroup = sender.endsWith('@g.us');
+        const groupName = isGroup ? msg.pushName || 'grupo' : 'privado';
+
+        console.log(`📝 Texto: "${text}" | Remitente: ${senderNumber} | Grupo: ${isGroup}`);
+
+        // --- FILTRO: Solo responde si es una pregunta o contiene palabras clave ---
+        const isQuestion = /¿|\?|quién|qué|cuándo|dónde|por qué|para qué|cómo|cuánto|IA|Zyon|bot|ZYON|Bot/i.test(text);
+        
+        if (!isQuestion) {
+            console.log('⏭️ No es una pregunta o no contiene palabras clave, ignorando');
+            return;
+        }
+
+        console.log(`🤖 Procesando pregunta de ${senderNumber}: ${text}`);
+
+        try {
+            // Indicar que está escribiendo
+            await sock.sendPresenceUpdate('composing', sender);
+            
+            // Obtener respuesta de la IA (con número y si es grupo)
+            const aiResponse = await getAIResponse(text, senderNumber, isGroup);
+            
+            // Enviar respuesta USANDO LA FUNCIÓN "RESPONDER" DE WHATSAPP
+            await sock.sendMessage(sender, {
+                text: aiResponse,
+                contextInfo: {
+                    quotedMessage: msg.message,
+                    mentionedJid: [sender] // Menciona al usuario
+                }
+            });
+            
+            console.log(`✅ Respuesta enviada a ${senderNumber}`);
+        } catch (error) {
+            console.error('❌ Error al procesar el mensaje:', error);
+        }
+    });
+
+    return sock;
 }
 
-module.exports = { getAIResponse };
+// Iniciar el bot
+startSock();
+
+// --- ENDPOINTS PARA LA WEB ---
+app.get('/api/qr', async (req, res) => {
+    if (!lastQR) {
+        return res.status(404).json({ error: 'No hay QR disponible. Espera a que se genere.' });
+    }
+    try {
+        const qrImage = await QRCode.toDataURL(lastQR);
+        res.json({ qr: qrImage });
+    } catch (error) {
+        console.error('Error al generar QR:', error);
+        res.status(500).json({ error: 'Error al generar el código QR' });
+    }
+});
+
+app.post('/api/pair', express.json(), async (req, res) => {
+    const { phoneNumber } = req.body;
+    if (!phoneNumber) {
+        return res.status(400).json({ error: 'El número de teléfono es requerido' });
+    }
+    const cleanNumber = phoneNumber.replace(/\D/g, '');
+    if (cleanNumber.length < 10) {
+        return res.status(400).json({ error: 'Número de teléfono inválido' });
+    }
+    try {
+        if (!sock) {
+            sock = await startSock();
+        }
+        const code = await sock.requestPairingCode(cleanNumber);
+        console.log(`📱 Código de vinculación para ${cleanNumber}: ${code}`);
+        lastPairingCode = code;
+        lastQR = null;
+        res.json({ pairingCode: code });
+    } catch (error) {
+        console.error('Error al generar código de vinculación:', error);
+        res.status(500).json({ error: 'Error al generar el código de vinculación' });
+    }
+});
+
+app.get('/api/status', (req, res) => {
+    const isConnected = sock?.authState?.creds?.registered || false;
+    res.json({
+        connected: isConnected,
+        hasQR: !!lastQR,
+        hasPairingCode: !!lastPairingCode
+    });
+});
+
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.listen(port, () => {
+    console.log(`🚀 Servidor corriendo en http://localhost:${port}`);
+    console.log('📱 Conectando a WhatsApp...');
+});
